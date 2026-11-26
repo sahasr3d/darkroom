@@ -56,7 +56,9 @@
   display: grid;
   height: 100dvh;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+  /* The finder never shrinks below a usable size; on short screens the page scrolls instead
+     of the shutter row sliding over the picture. */
+  grid-template-rows: auto minmax(260px, 1fr) auto auto auto;
   grid-template-areas: 'status' 'finder' 'controls' 'shelf' 'drawer';
 }
 /* Phones: with the settings drawer pulled up, the page scrolls instead of crushing the finder. */
