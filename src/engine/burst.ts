@@ -1,5 +1,6 @@
-import { applyPalette, GIFEncoder, quantize } from 'gifenc'
 import type { BurstSpec } from '../cameras/types'
+import type { GifJob, GifReply } from './gif.worker'
+import { encodeGifBytes, type RgbaFrame } from './gifEncode'
 import type { Pipeline, Shot, SourceImage } from './pipeline'
 import { startRecording } from './recorder'
 
@@ -51,7 +52,7 @@ export function developBurst(pipeline: Pipeline, shot: Shot, frames: readonly So
   })
 }
 
-function scaled(src: HTMLCanvasElement, maxEdge: number): ImageData {
+function scaled(src: HTMLCanvasElement, maxEdge: number): RgbaFrame {
   const s = Math.min(1, maxEdge / Math.max(src.width, src.height))
   const c = document.createElement('canvas')
   c.width = Math.max(1, Math.round(src.width * s))
@@ -59,20 +60,52 @@ function scaled(src: HTMLCanvasElement, maxEdge: number): ImageData {
   const ctx = c.getContext('2d', { willReadFrequently: true })
   if (!ctx) throw new Error('2D canvas unavailable')
   ctx.drawImage(src, 0, 0, c.width, c.height)
-  return ctx.getImageData(0, 0, c.width, c.height)
+  const img = ctx.getImageData(0, 0, c.width, c.height)
+  c.width = 0
+  return { data: img.data, width: img.width, height: img.height }
 }
 
-/** Encode frames (in `order`) as a looping GIF; each frame gets its own 256-colour palette. */
-export function encodeGif(frames: readonly HTMLCanvasElement[], order: readonly number[], delayMs: number, maxEdge = 640): Blob {
-  const images = frames.map((f) => scaled(f, maxEdge))
-  const gif = GIFEncoder()
-  order.forEach((idx, n) => {
-    const img = images[idx]
-    const palette = quantize(img.data, 256)
-    gif.writeFrame(applyPalette(img.data, palette), img.width, img.height, { palette, delay: delayMs, repeat: n === 0 ? 0 : undefined })
+const gifBlob = (bytes: Uint8Array<ArrayBuffer>): Blob => new Blob([bytes], { type: 'image/gif' })
+
+/** Run one encode on a worker; the frame buffers are transferred (and detached here). */
+function encodeOnWorker(worker: Worker, job: GifJob): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    worker.onmessage = (e: MessageEvent<GifReply>) => (e.data.ok ? resolve(gifBlob(e.data.bytes)) : reject(new Error(e.data.message)))
+    worker.onerror = (e) => {
+      e.preventDefault()
+      reject(new Error(e.message || 'The GIF worker stopped.'))
+    }
+    worker.postMessage(job, job.frames.map((f) => f.data.buffer))
   })
-  gif.finish()
-  return new Blob([gif.bytes().slice()], { type: 'image/gif' })
+}
+
+/**
+ * Encode frames (in `order`) as a looping GIF, each frame with its own 256-colour palette.
+ * Runs in a Web Worker so the viewfinder keeps moving; falls back to the main thread where
+ * module workers are unavailable or the worker fails.
+ */
+export async function encodeGif(frames: readonly HTMLCanvasElement[], order: readonly number[], delayMs: number, maxEdge = 640): Promise<Blob> {
+  const mainThread = () => gifBlob(encodeGifBytes(frames.map((f) => scaled(f, maxEdge)), order, delayMs))
+  let worker: Worker
+  try {
+    worker = new Worker(new URL('./gif.worker.ts', import.meta.url), { type: 'module', name: 'gif-encoder' })
+  } catch {
+    return mainThread()
+  }
+  try {
+    // Downscale one frame per task so the viewfinder keeps drawing between them.
+    const images: RgbaFrame[] = []
+    for (const f of frames) {
+      images.push(scaled(f, maxEdge))
+      await new Promise((r) => setTimeout(r, 0))
+    }
+    return await encodeOnWorker(worker, { frames: images, order: [...order], delayMs })
+  } catch {
+    // The transferred buffers are gone; rescale from the developed canvases and encode here.
+    return mainThread()
+  } finally {
+    worker.terminate()
+  }
 }
 
 /** Record the loop as a short video clip (a few passes so it plays smoothly where it won't loop). */

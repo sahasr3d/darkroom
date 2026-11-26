@@ -208,6 +208,7 @@ void main() {
 // ---------------------------------------------------------------------------
 export const FILM_SRC = /* glsl */ `#version 300 es
 precision highp float;
+precision highp sampler3D;
 in vec2 vUv;
 in vec2 vTex;
 out vec4 outColor;
@@ -219,6 +220,11 @@ uniform mat3 uColorMatrix;
 uniform vec3 uColorOffset;
 uniform float uExposure;
 uniform float uNd;
+uniform float uLutMix;
+uniform sampler3D uLut;   // unit 2; a 2x2x2 identity cube when no grade is loaded
+uniform float uLutSize;
+uniform vec3 uLutMin;
+uniform vec3 uLutMax;
 uniform vec3 uWbGain;
 uniform vec3 uGain;
 uniform float uContrast;
@@ -269,6 +275,14 @@ void main() {
   col *= exp2(uExposure - uNd) * uGain;
   // Projector / cheap-shutter flicker: each frame lands a little brighter or darker.
   if (uFlicker > 0.001) col *= 1.0 + uFlicker * (hash12(vec2(floor(uTime * 24.0), uSeed + 3.0)) - 0.5) * 0.35;
+
+  // Custom grade: map into the cube's domain, then scale/offset by half a texel so 0 and 1 land
+  // on the first and last lattice points instead of the texture edges.
+  if (uLutMix > 0.001) {
+    vec3 lu = clamp((col - uLutMin) / max(uLutMax - uLutMin, vec3(1e-5)), 0.0, 1.0);
+    vec3 lc = lu * ((uLutSize - 1.0) / uLutSize) + 0.5 / uLutSize;
+    col = mix(col, texture(uLut, lc).rgb, uLutMix);
+  }
 
   vec2 ap = (vUv - 0.5) * vec2(asp, 1.0);
   float rad = length(ap) / length(vec2(asp, 1.0) * 0.5);

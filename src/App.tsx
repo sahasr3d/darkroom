@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFullscreen, useHardwareSync, useSelfTimer } from './app/hooks'
-import { runBurst, useVideoRecorder } from './app/motion'
+import { useCustomGrade } from './app/useCustomGrade'
+import { useVideoRecorder } from './app/useVideoRecorder'
 import { fpsOf } from './cameras/bodies/video'
 import { formatCounter } from './engine/overlays/video'
 import { bodyById, initialParams } from './cameras/registry'
@@ -19,6 +20,7 @@ import { useHorizon } from './engine/useHorizon'
 import { AidsPanel, DEFAULT_AIDS, type Aids } from './ui/AidsPanel'
 import { BodyDrawer, type DrawerTab } from './ui/BodyDrawer'
 import { BodyShelf } from './ui/BodyShelf'
+import { CustomGrade } from './ui/CustomGrade'
 import { IconClose } from './ui/icons'
 import { LensDock } from './ui/LensDock'
 import { ManualPanel } from './ui/ManualPanel'
@@ -111,7 +113,7 @@ export default function App() {
     shotRef.current = shot
   }, [shot])
   const getShot = useCallback(() => shotRef.current, [])
-  const recorder = useVideoRecorder(pipeline, getShot, setStatus, setStatus)
+  const recorder = useVideoRecorder(pipeline, getShot, setStatus)
   const [recElapsed, setRecElapsed] = useState(0)
   useEffect(() => {
     const since = recorder.since
@@ -162,6 +164,7 @@ export default function App() {
   }, [pair])
 
   const setRig = useCallback((patch: Partial<Rig>) => setRigState((r) => ({ ...r, ...patch })), [])
+  const grade = useCustomGrade(pipeline, setRig, setStatus)
   const setAids = useCallback((patch: Partial<Aids>) => setAidsState((a) => ({ ...a, ...patch })), [])
 
   /** Always derive from the latest stored params so rapid edits never overwrite each other. */
@@ -287,8 +290,7 @@ export default function App() {
         return
       }
       playShutter('digital')
-      recorder.start()
-      setStatus(`Rolling at ${fpsOf(params)} fps. Press again to stop.`)
+      void recorder.start(aids.sound)
       return
     }
     if (body.burst) {
@@ -298,7 +300,9 @@ export default function App() {
       setExposureKey((k) => k + 1)
       setBusy('png')
       setStatus(body.burst.kind === 'wiggle' ? 'Firing four lenses…' : 'Firing sixteen frames…')
-      runBurst(pipeline, shot, grab)
+      // The burst machinery (GIF worker, loop recorder) loads on the first press.
+      import('./app/motion')
+        .then(({ runBurst }) => runBurst(pipeline, shot, grab))
         .then((msg) => {
           setStatus(msg)
           setShots((n) => n + 1)
@@ -446,7 +450,19 @@ export default function App() {
           onPng={() => shot && void runExport('png', shot)}
           onStory={() => shot && void runExport('story', shot)}
           panels={{
-            lens: <LensDock rig={rig} caps={body.accessories} badge={body.badge} onRig={setRig} />,
+            lens: (
+              <LensDock rig={rig} caps={body.accessories} badge={body.badge} onRig={setRig}>
+                <CustomGrade
+                  grade={grade.grade}
+                  strength={rig.lutStrength}
+                  error={grade.error}
+                  loading={grade.loading}
+                  onFile={(f) => void grade.load(f)}
+                  onRemove={grade.remove}
+                  onStrength={(v) => setRig({ lutStrength: v })}
+                />
+              </LensDock>
+            ),
             manual: <ManualPanel rig={rig} caps={body.accessories} badge={body.badge} hardware={hardware} live={live} onRig={setRig} />,
             aids: (
               <AidsPanel
@@ -456,6 +472,7 @@ export default function App() {
                 multiFrame={multiFrame}
                 hasSecond={!!pair}
                 live={live}
+                videoBody={body.medium === 'video'}
                 onAids={setAids}
                 onRig={setRig}
                 onFullscreen={fullscreen.toggle}

@@ -5,10 +5,15 @@
  */
 
 const MIME_CANDIDATES = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4;codecs=avc1', 'video/mp4'] as const
+/** With a sound track, ask for a codec pair that carries audio (Opus in WebM, AAC in MP4). */
+const AUDIO_MIME_CANDIDATES = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4;codecs=avc1,mp4a.40.2', 'video/mp4'] as const
+
+const browserSupports = (t: string): boolean => typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(t)
 
 /** The first container/codec this browser can record, or null if MediaRecorder can't do video. */
-export function pickMimeType(isSupported: (type: string) => boolean = (t) => typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(t)): string | null {
-  return MIME_CANDIDATES.find((t) => isSupported(t)) ?? null
+export function pickMimeType(isSupported: (type: string) => boolean = browserSupports, withAudio = false): string | null {
+  const candidates: readonly string[] = withAudio ? AUDIO_MIME_CANDIDATES : MIME_CANDIDATES
+  return candidates.find((t) => isSupported(t)) ?? null
 }
 
 export const extensionFor = (mime: string): string => (mime.startsWith('video/mp4') ? 'mp4' : 'webm')
@@ -39,6 +44,8 @@ interface StartOptions {
   /** Called if an automatic stop fails to save. */
   onAutoStopError?: (err: unknown) => void
   bitsPerSecond?: number
+  /** Processed sound to record alongside the frames; omit for a silent clip. */
+  audioTrack?: MediaStreamTrack | null
 }
 
 type FrameTrack = MediaStreamTrack & { requestFrame?: () => void }
@@ -51,7 +58,9 @@ export class RecordingUnsupportedError extends Error {
 }
 
 export function startRecording(opts: StartOptions): RecordingSession {
-  const mimeType = pickMimeType()
+  const audioTrack = opts.audioTrack ?? null
+  // Fall back to a silent-capable type if this browser can't pair audio with video.
+  const mimeType = (audioTrack ? pickMimeType(browserSupports, true) : null) ?? pickMimeType()
   if (!mimeType || typeof opts.canvas.captureStream !== 'function') {
     throw new RecordingUnsupportedError('This browser cannot record video from a canvas. Try a current Chrome, Edge, Firefox or Safari.')
   }
@@ -66,7 +75,9 @@ export function startRecording(opts: StartOptions): RecordingSession {
     track = stream.getVideoTracks()[0] as FrameTrack | undefined
   }
 
-  const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: opts.bitsPerSecond ?? 8_000_000 })
+  if (audioTrack) stream.addTrack(audioTrack)
+
+  const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: opts.bitsPerSecond ?? 8_000_000, audioBitsPerSecond: audioTrack ? 128_000 : undefined })
   const chunks: Blob[] = []
   recorder.ondataavailable = (e) => {
     if (e.data.size > 0) chunks.push(e.data)

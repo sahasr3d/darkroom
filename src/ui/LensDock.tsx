@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import type { AccessoryId } from '../cameras/types'
 import { ND_STOPS } from '../engine/exposure'
 import { FOCAL_PRESETS, GELS, type GelId, type LensId, type Rig } from '../engine/look'
@@ -9,6 +10,8 @@ type Props = {
   caps: readonly AccessoryId[]
   badge: string
   onRig: (patch: Partial<Rig>) => void
+  /** Extra groups that apply to every body (the custom grade), shown after the filters. */
+  children?: ReactNode
 }
 
 const FOCAL_MIN = 13
@@ -25,7 +28,7 @@ const gelCss = (id: GelId): string => {
 }
 
 /** The accessory drawer: focal length, lens attachments, filters and flash. */
-export function LensDock({ rig, caps, badge, onRig }: Props) {
+export function LensDock({ rig, caps, badge, onRig, children }: Props) {
   const has = (a: AccessoryId) => caps.includes(a)
   const unavailable = `Not available on the ${badge}`
   const lensOptions: { value: LensId; label: string; cap: AccessoryId | null }[] = [
@@ -102,6 +105,8 @@ export function LensDock({ rig, caps, badge, onRig }: Props) {
         />
         {has('leak') ? <Switch label="Random light leak" checked={rig.leak} onChange={(v) => onRig({ leak: v })} /> : <p className="text-[11px] text-dim">Light leak: {unavailable.toLowerCase()}.</p>}
       </ControlGroupBox>
+
+      {children}
 
       <ControlGroupBox title="Flash">
         {has('flash') ? (

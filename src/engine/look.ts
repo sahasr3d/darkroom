@@ -45,6 +45,8 @@ export interface LookParams {
   colorOffset: Vec3
   exposure: number
   nd: number
+  /** Custom 3D LUT (.cube) blend, applied right after the colour matrix and exposure. */
+  lutMix: number
   wbGain: Vec3
   gain: Vec3
   contrast: number
@@ -106,6 +108,7 @@ export const NEUTRAL_LOOK: LookParams = {
   colorOffset: [0, 0, 0],
   exposure: 0,
   nd: 0,
+  lutMix: 0,
   wbGain: [1, 1, 1],
   gain: [1, 1, 1],
   contrast: 1,
@@ -246,6 +249,10 @@ export interface Rig {
   blend: BlendMode
   /** 0..100: how much of the second exposure shows. */
   balance: number
+  /** Identity of the loaded custom grade (.cube LUT), or null for none. Works on every body. */
+  lutId: string | null
+  /** 0..100: strength of the custom grade. */
+  lutStrength: number
 }
 
 export const DEFAULT_RIG: Rig = {
@@ -269,6 +276,8 @@ export const DEFAULT_RIG: Rig = {
   double: false,
   blend: 'screen',
   balance: 50,
+  lutId: null,
+  lutStrength: 100,
 }
 
 /** Accessory capabilities a body exposes (mirrors AccessoryId in cameras/types). */
@@ -290,6 +299,14 @@ export function gateRig(rig: Rig, caps: readonly RigCapability[], multiFrame: bo
     tint: has('manual') ? rig.tint : 0,
     double: rig.double && !multiFrame,
   }
+}
+
+/**
+ * The custom grade as part of a body's look target, so it scales with the body's intensity
+ * like every other strength (mixLook lerps it from 0).
+ */
+export function lutTarget(rig: Pick<Rig, 'lutId' | 'lutStrength'>): Pick<LookParams, 'lutMix'> {
+  return { lutMix: rig.lutId ? clamp(rig.lutStrength / 100, 0, 1) : 0 }
 }
 
 /** Focal length → crop zoom (longer than 24mm) or extra barrel (wider than 24mm). */

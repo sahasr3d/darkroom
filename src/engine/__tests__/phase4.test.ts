@@ -4,6 +4,7 @@ import { fpsOf } from '../../cameras/bodies/video'
 import { CAMERA_BODIES } from '../../cameras/registry'
 import { playOrder, sheetGeometry, wiggleOrder, WIGGLE_VIEWS } from '../burst'
 import { marginsFor } from '../compositor'
+import { encodeGifBytes } from '../gifEncode'
 import { camcorderStamp, formatCounter, formatTimecode } from '../overlays/video'
 import { extensionFor, pickMimeType } from '../recorder'
 
@@ -107,5 +108,15 @@ describe('GIF encoding', () => {
     expect(bytes[bytes.length - 1]).toBe(0x3b)
     // NETSCAPE2.0 application extension = loop forever.
     expect(String.fromCharCode(...bytes).includes('NETSCAPE2.0')).toBe(true)
+  })
+
+  test('the shared encoder (worker and fallback) writes frames in play order', () => {
+    const frame = (v: number) => ({ data: new Uint8ClampedArray(4 * 4 * 4).map((_, i) => (i % 4 === 3 ? 255 : v)), width: 4, height: 4 })
+    const bytes = encodeGifBytes([frame(10), frame(200)], [0, 1, 0], 80)
+    expect(String.fromCharCode(...bytes.slice(0, 6))).toBe('GIF89a')
+    expect(bytes[bytes.length - 1]).toBe(0x3b)
+    // One graphic control extension (0x21 0xF9) per written frame.
+    const frames = bytes.reduce((n, b, i) => (b === 0x21 && bytes[i + 1] === 0xf9 ? n + 1 : n), 0)
+    expect(frames).toBe(3)
   })
 })

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type PointerEvent } from 'react'
 import type { Rect } from '../cameras/types'
 import type { Pipeline, Shot } from '../engine/pipeline'
+import { INITIAL_GOVERNOR, previewTag, scaleOf, stepGovernor } from '../engine/previewScale'
 import { clamp } from '../engine/rng'
 import type { GridKind } from './AidsPanel'
 import { FinderOverlays } from './FinderOverlays'
@@ -81,6 +82,9 @@ export function Viewfinder({ pipeline, error, shot, compare, exposureKey, onFile
   const [dragging, setDragging] = useState(false)
   const [renderError, setRenderError] = useState<string | null>(null)
   const [glEpoch, setGlEpoch] = useState(0)
+  /** Adaptive preview resolution: render-time governor (ref, per frame) and its level (state, rare). */
+  const governor = useRef(INITIAL_GOVERNOR)
+  const [previewLevel, setPreviewLevel] = useState(0)
 
   useEffect(() => {
     if (!pipeline) return
@@ -90,13 +94,20 @@ export function Viewfinder({ pipeline, error, shot, compare, exposureKey, onFile
     }
   }, [pipeline])
 
+  const animated = !!shot && (!!shot.source.live || shot.body.animated(shot.params))
+  // Stills always preview at full resolution; only moving previews trade pixels for frame rate.
+  const previewScale = animated ? scaleOf({ level: previewLevel }) : 1
+
   const layout = useMemo(() => {
     if (!pipeline || !shot || box.w < 8 || box.h < 8) return null
     const dpr = Math.min(window.devicePixelRatio || 1, 2)
-    return pipeline.previewLayout(shot, Math.min(box.w * dpr, PREVIEW_MAX_EDGE), Math.min(box.h * dpr, PREVIEW_MAX_EDGE))
-  }, [pipeline, shot, box.w, box.h])
+    const edge = PREVIEW_MAX_EDGE * previewScale
+    return pipeline.previewLayout(shot, Math.min(box.w * dpr * previewScale, edge), Math.min(box.h * dpr * previewScale, edge))
+  }, [pipeline, shot, box.w, box.h, previewScale])
 
-  const animated = !!shot && (!!shot.source.live || shot.body.animated(shot.params))
+  useEffect(() => {
+    if (!animated) governor.current = INITIAL_GOVERNOR
+  }, [animated])
 
   useEffect(() => {
     if (!pipeline || !shot || !layout) return
@@ -107,7 +118,13 @@ export function Viewfinder({ pipeline, error, shot, compare, exposureKey, onFile
     let last = -Infinity
     const draw = (now: number) => {
       try {
+        const t0 = performance.now()
         pipeline.render(after, shot, layout, { time: now / 1000, forExport: false, elapsed: recordingSince === null ? null : (now - recordingSince) / 1000 })
+        if (animated) {
+          const next = stepGovernor(governor.current, performance.now() - t0)
+          if (next.level !== governor.current.level) setPreviewLevel(next.level)
+          governor.current = next
+        }
         if (compare) pipeline.renderBefore(before, after, shot, layout)
         setRenderError(null)
       } catch (err: unknown) {
@@ -206,7 +223,9 @@ export function Viewfinder({ pipeline, error, shot, compare, exposureKey, onFile
   }
 
   const shownError = error ?? renderError
-  const tagClass = 'pointer-events-none absolute top-2 bg-black/70 px-1.5 py-0.5 font-[family-name:var(--font-osd)] text-[11px] text-amber'
+  const scaleTag = previewTag(previewScale)
+  const tagBase = 'pointer-events-none absolute bg-black/70 px-1.5 py-0.5 font-[family-name:var(--font-osd)] text-[11px] text-amber'
+  const tagClass = `${tagBase} top-2`
 
   return (
     <section
@@ -271,6 +290,11 @@ export function Viewfinder({ pipeline, error, shot, compare, exposureKey, onFile
                   <span className="split-grip" />
                 </div>
               </>
+            )}
+            {scaleTag && (
+              <span className={`${tagBase} bottom-2 right-2`}>
+                {scaleTag}
+              </span>
             )}
             {exposureKey > 0 && <div key={exposureKey} className="curtain pointer-events-none absolute inset-0 bg-black" aria-hidden="true" />}
           </div>

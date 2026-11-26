@@ -8,6 +8,7 @@ import '@fontsource/permanent-marker/400.css'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
+import { registerServiceWorker } from './app/serviceWorker'
 import { ErrorBoundary } from './ui/ErrorBoundary'
 
 const root = document.getElementById('root')
@@ -20,3 +21,5 @@ createRoot(root).render(
     </ErrorBoundary>
   </StrictMode>,
 )
+
+registerServiceWorker()

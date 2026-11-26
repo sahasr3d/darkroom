@@ -1,5 +1,6 @@
 import { ANALOG_SRC, FILM_SRC, OPTICS_SRC, VERTEX_SRC } from './gl/shaders'
 import type { LookParams } from './look'
+import { identityLut, toRgba, type CubeLut } from './lut'
 
 export type SrcRect = readonly [number, number, number, number]
 
@@ -36,6 +37,9 @@ interface Pass {
   program: WebGLProgram
   locations: Map<string, WebGLUniformLocation | null>
 }
+
+/** Texture unit of the custom-grade 3D LUT (0 = pass input, 1 = second exposure). */
+const LUT_UNIT = 2
 
 const SPECIAL_NAMES: Partial<Record<keyof LookParams, string>> = { ca: 'uCA', staticNoise: 'uStatic' }
 export const uniformName = (key: keyof LookParams): string => SPECIAL_NAMES[key] ?? `u${key[0].toUpperCase()}${key.slice(1)}`
@@ -74,6 +78,10 @@ export class Renderer {
   /** Two source textures: the main frame and the paired frame (half-frame frame B). */
   private sources: { tex: WebGLTexture; size: [number, number]; last: TexImageSource | null; mips: boolean; hasMips: boolean }[] = []
   private lost = false
+  /** The custom grade's 3D texture: always complete (an identity cube when nothing is loaded). */
+  private lutTex!: WebGLTexture
+  private lut: CubeLut | null = null
+  private lutBound: CubeLut = identityLut()
 
   constructor() {
     this.canvas = document.createElement('canvas')
@@ -157,6 +165,45 @@ export class Renderer {
     this.sources = [0, 1].map(() => ({ tex: this.makeTexture(true), size: [1, 1] as [number, number], last: null, mips: true, hasMips: false }))
     this.a = this.makeTarget(true)
     this.b = this.makeTarget(false)
+    const lutTex = gl.createTexture()
+    if (!lutTex) throw new WebGLUnavailableError('Could not allocate the LUT texture')
+    this.lutTex = lutTex
+    this.uploadLut(this.lut ?? identityLut())
+  }
+
+  /** Upload a cube as RGBA16F (filterable in WebGL2) with trilinear sampling and clamped edges. */
+  private uploadLut(lut: CubeLut): void {
+    const gl = this.gl
+    gl.activeTexture(gl.TEXTURE0 + LUT_UNIT)
+    gl.bindTexture(gl.TEXTURE_3D, this.lutTex)
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4)
+    gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGBA16F, lut.size, lut.size, lut.size, 0, gl.RGBA, gl.FLOAT, toRgba(lut))
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE)
+    gl.activeTexture(gl.TEXTURE0)
+    this.lutBound = lut
+  }
+
+  /** Load a custom grade, or with null fall back to the identity cube. Survives context loss. */
+  setLut(lut: CubeLut | null): void {
+    this.lut = lut
+    if (!this.lost) this.uploadLut(lut ?? identityLut())
+  }
+
+  /** Bind the grade to its unit and describe its lattice to the film pass. */
+  private bindLut(pass: Pass): void {
+    const gl = this.gl
+    const lut = this.lutBound
+    gl.activeTexture(gl.TEXTURE0 + LUT_UNIT)
+    gl.bindTexture(gl.TEXTURE_3D, this.lutTex)
+    gl.uniform1i(this.loc(pass, 'uLut'), LUT_UNIT)
+    gl.uniform1f(this.loc(pass, 'uLutSize'), lut.size)
+    gl.uniform3f(this.loc(pass, 'uLutMin'), ...lut.domainMin)
+    gl.uniform3f(this.loc(pass, 'uLutMax'), ...lut.domainMax)
+    gl.activeTexture(gl.TEXTURE0)
   }
 
   private resizeTarget(t: Target, w: number, h: number): void {
@@ -269,6 +316,7 @@ export class Renderer {
     gl.generateMipmap(gl.TEXTURE_2D)
 
     this.setUniforms(this.passes.film, req, this.a.tex, w, h)
+    this.bindLut(this.passes.film)
     this.draw(this.b.fb, w, h)
 
     this.setUniforms(this.passes.analog, req, this.b.tex, w, h)

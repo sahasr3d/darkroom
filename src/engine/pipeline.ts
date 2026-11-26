@@ -1,7 +1,8 @@
 import { intensityOf, num, type CameraBody, type Layout, type Params, type SlotSpec } from '../cameras/types'
 import { composite, marginsFor } from './compositor'
 import { cropRect, layoutForExport, layoutToFit, type LayoutInput } from './layout'
-import { applyRig, gateRig, mixLook, type LookParams, type Rig } from './look'
+import { applyRig, gateRig, lutTarget, mixLook, type LookParams, type Rig } from './look'
+import type { CubeLut } from './lut'
 import { Renderer, type RenderRequest, type SourceSlot, type SrcRect } from './renderer'
 
 export interface SourceImage {
@@ -91,6 +92,11 @@ export class Pipeline {
     }
   }
 
+  /** Load (or with null, remove) the custom grade used by every body's film pass. */
+  setLut(lut: CubeLut | null): void {
+    this.renderer.setLut(lut)
+  }
+
   previewLayout(shot: Shot, maxW: number, maxH: number): Layout {
     return layoutToFit(layoutInput(shot), Math.min(maxW, this.maxSize * 2), Math.min(maxH, this.maxSize))
   }
@@ -111,7 +117,8 @@ export class Pipeline {
 
     const seed = seedOf(params)
     const gated = gateRig(rig, body.accessories, layout.slots.length > 1)
-    const look: LookParams = { ...applyRig(mixLook(body.look(params), intensityOf(params)), gated, seed), ...opts.lookPatch }
+    const graded = { ...body.look(params), ...lutTarget(gated) }
+    const look: LookParams = { ...applyRig(mixLook(graded, intensityOf(params)), gated, seed), ...opts.lookPatch }
     // Double exposure: the paired frame becomes the second exposure on single-frame bodies.
     const doubleSrc = gated.double && shot.pair ? shot.pair : null
     look.double = doubleSrc ? 1 : 0

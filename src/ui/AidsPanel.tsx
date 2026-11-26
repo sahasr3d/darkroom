@@ -11,9 +11,11 @@ export interface Aids {
   timer: TimerSeconds
   level: boolean
   dualSave: boolean
+  /** Video bodies: record sound (microphone or the imported video's track) through the body's sound chain. */
+  sound: boolean
 }
 
-export const DEFAULT_AIDS: Aids = { grid: 'off', timer: 0, level: false, dualSave: false }
+export const DEFAULT_AIDS: Aids = { grid: 'off', timer: 0, level: false, dualSave: false, sound: true }
 
 type Props = {
   aids: Aids
@@ -22,6 +24,8 @@ type Props = {
   multiFrame: boolean
   hasSecond: boolean
   live: boolean
+  /** The mounted body records video, so the sound switch applies. */
+  videoBody: boolean
   onAids: (patch: Partial<Aids>) => void
   onRig: (patch: Partial<Rig>) => void
   onFullscreen: () => void
@@ -73,6 +77,19 @@ export function AidsPanel(p: Props) {
         />
         <Switch label="Save the original too" checked={aids.dualSave} onChange={(v) => p.onAids({ dualSave: v })} />
       </ControlGroupBox>
+
+      {p.videoBody && (
+        <ControlGroupBox title="Sound">
+          <Switch label="Record sound" checked={aids.sound} onChange={(v) => p.onAids({ sound: v })} />
+          <p className="text-[11px] leading-4 text-dim [text-wrap:pretty]">
+            {!aids.sound
+              ? 'Clips record silent.'
+              : p.live
+                ? 'Records the microphone through this body’s sound: tape hiss, projector clatter or camcorder hum. The browser asks for the microphone when you start rolling.'
+                : 'Records an imported video’s own sound through this body’s character. Over a photo you get just its tape hiss or projector clatter, if it has any.'}
+          </p>
+        </ControlGroupBox>
+      )}
 
       <ControlGroupBox title="Double exposure">
         {p.multiFrame ? (
