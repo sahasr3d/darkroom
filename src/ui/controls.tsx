@@ -92,7 +92,7 @@ type SwitchProps = {
 /** Toggle with an LED that lights amber when on. */
 export function Switch({ label, checked, onChange }: SwitchProps) {
   return (
-    <button type="button" role="switch" aria-checked={checked} onClick={() => onChange(!checked)} className="group flex min-h-[34px] w-full items-center justify-between gap-3 text-left">
+    <button type="button" role="switch" aria-checked={checked} onClick={() => onChange(!checked)} className="switch-row group flex w-full items-center justify-between gap-3 text-left">
       <span className="engrave group-hover:text-silver">{label}</span>
       <span aria-hidden="true" className="flex items-center gap-2">
         <span className={`led ${checked ? 'led-amber' : ''}`} />
@@ -175,7 +175,7 @@ export function Swatches({ label, value, options, onChange }: SwatchesProps) {
       <span id={labelId} className="engrave">
         {label}: <span className="text-silver">{current?.label}</span>
       </span>
-      <div role="radiogroup" aria-labelledby={labelId} className="flex gap-2">
+      <div role="radiogroup" aria-labelledby={labelId} className="flex flex-wrap gap-2">
         {options.map((o) => (
           <button
             key={o.value}
@@ -185,7 +185,7 @@ export function Swatches({ label, value, options, onChange }: SwatchesProps) {
             aria-label={o.label}
             title={o.label}
             onClick={() => onChange(o.value)}
-            className={`h-7 w-7 border border-line-hi ${o.value === value ? 'outline outline-1 outline-offset-2 outline-amber' : ''}`}
+            className={`swatch border border-line-hi ${o.value === value ? 'outline outline-1 outline-offset-2 outline-amber' : ''}`}
             style={{ background: o.value }}
           />
         ))}

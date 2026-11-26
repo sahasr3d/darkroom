@@ -19,10 +19,10 @@ export function StatusBar({ body, rig, sourceLabel, live, shots, status }: Props
   return (
     <header className="hairline-b flex items-center gap-3 px-3 py-2 lg:px-4">
       <span className={`led ${live ? 'led-red' : 'led-amber'}`} aria-hidden="true" />
-      <h1 className="badge truncate text-[14px]">{body.badge}</h1>
+      <h1 className="badge truncate text-[14px]" translate="no">{body.badge}</h1>
       <span className="truncate font-[family-name:var(--font-osd)] text-[12px] text-dim max-sm:hidden">{body.format}</span>
       <span className="ml-auto flex min-w-0 items-center gap-3 font-[family-name:var(--font-osd)] text-[12px]">
-        <span className="truncate text-dim max-md:hidden" role="status" aria-live="polite">
+        <span className="truncate text-dim max-md:sr-only" role="status" aria-live="polite">
           {status}
         </span>
         <span className="text-dim max-sm:hidden" title="Source">

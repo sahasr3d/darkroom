@@ -29,7 +29,7 @@ export function BodyShelf({ value, onChange }: Props) {
   }
 
   return (
-    <nav aria-label="Camera shelf" className="h-full min-h-0">
+    <nav aria-label="Camera shelf" className="h-full min-h-0" data-coach="shelf">
       <div
         ref={listRef}
         role="radiogroup"

@@ -1,7 +1,7 @@
 import { useId, type KeyboardEvent, type ReactNode } from 'react'
+import type { DrawerTab } from '../app/aids'
 import { num, str, type CameraBody, type Control, type ParamValue, type Params } from '../cameras/types'
 
-export type DrawerTab = 'body' | 'lens' | 'manual' | 'aids'
 const TABS: readonly { id: DrawerTab; label: string }[] = [
   { id: 'body', label: 'Body' },
   { id: 'lens', label: 'Lens' },
@@ -24,6 +24,8 @@ type Props = {
   onTab: (tab: DrawerTab) => void
   /** Content for the non-body tabs (lens dock, manual dials, aids). */
   panels: Record<Exclude<DrawerTab, 'body'>, ReactNode>
+  /** Saved recipes, shown at the top of the Body tab. */
+  recipes: ReactNode
   onParam: (key: string, value: ParamValue) => void
   onRandomize: () => void
   onAction: (key: string) => void
@@ -70,7 +72,7 @@ export function BodyDrawer(p: Props) {
   return (
     <section aria-label={`${p.body.badge} settings`} className="flex h-full min-h-0 flex-col border-line max-lg:hairline-t lg:border-l">
       <div className="flex items-center gap-2 py-1.5 pr-3">
-        <button type="button" className="flex min-w-0 flex-1 items-center justify-between gap-3 py-1 pl-4 text-left lg:pointer-events-none" aria-expanded={p.open} aria-controls={panelId} onClick={p.onToggle}>
+        <button type="button" className="drawer-head flex min-w-0 flex-1 items-center justify-between gap-3 py-1 pl-4 text-left lg:pointer-events-none" aria-expanded={p.open} aria-controls={panelId} onClick={p.onToggle}>
           <span className="min-w-0">
             <span className="block text-[12px] text-silver">Camera settings</span>
             <span className="block truncate text-[11px] text-dim">{p.body.tagline}</span>
@@ -95,7 +97,7 @@ export function BodyDrawer(p: Props) {
               aria-controls={`${panelId}-panel`}
               tabIndex={p.tab === t.id ? 0 : -1}
               onClick={() => p.onTab(t.id)}
-              className={`relative py-2 text-[11px] ${p.tab === t.id ? 'text-amber' : 'text-dim hover:text-silver'}`}
+              className={`drawer-tab ${p.tab === t.id ? 'text-amber' : 'text-dim hover:text-silver'}`}
             >
               {t.label}
               {p.tab === t.id && <span className="absolute inset-x-3 bottom-0 h-px bg-amber" aria-hidden="true" />}
@@ -105,7 +107,8 @@ export function BodyDrawer(p: Props) {
         <div id={`${panelId}-panel`} role="tabpanel" aria-labelledby={`${panelId}-tab-${p.tab}`} className="scroll-quiet min-h-0 flex-1 lg:overflow-y-auto">
           {p.tab === 'body' ? (
             <>
-              <div className="grid gap-3 px-4 pb-4 pt-3">
+              {p.recipes}
+              <div className="hairline-t grid gap-3 px-4 pb-4 pt-3">
                 <Fader label="Intensity" size="master" value={num(p.params, 'intensity')} min={0} max={100} step={1} resetTo={num(p.body.defaults, 'intensity')} onChange={(v) => p.onParam('intensity', v)} />
                 <button type="button" className="key w-full" onClick={p.onRandomize}>
                   <IconDice />

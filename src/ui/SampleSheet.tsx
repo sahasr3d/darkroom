@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { CameraBody } from '../cameras/types'
 import { DEFAULT_RIG } from '../engine/look'
 import type { Pipeline, Shot } from '../engine/pipeline'
 import { SCENES, type SceneId } from '../engine/scenes'
 import { sceneSource } from '../engine/sources'
 import { IconClose } from './icons'
+import { useDialog } from './useDialog'
 
 type Props = {
   pipeline: Pipeline
@@ -31,7 +32,7 @@ function developSample(pipeline: Pipeline, body: CameraBody, scene: SceneId): st
 
 /** "Sample" contact sheet: the body's stock look on every built-in scene, before you shoot. */
 export function SampleSheet({ pipeline, body, onClose }: Props) {
-  const dialogRef = useRef<HTMLDivElement>(null)
+  const dialogRef = useDialog<HTMLDivElement>(onClose)
   const [samples, setSamples] = useState<Sample[]>([])
   const [error, setError] = useState<string | null>(null)
 
@@ -56,23 +57,15 @@ export function SampleSheet({ pipeline, body, onClose }: Props) {
     }
   }, [pipeline, body])
 
-  useEffect(() => {
-    dialogRef.current?.querySelector<HTMLElement>('button')?.focus()
-    const onKey = (e: globalThis.KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
 
   return (
-    <div className="fixed inset-0 z-40 grid place-items-center bg-black/80 p-3" onClick={onClose}>
+    <div className="sheet-backdrop lg:place-items-center" onClick={onClose}>
       <div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label={`${body.badge} samples`}
-        className="plate scroll-quiet grid max-h-[92dvh] w-full max-w-[980px] gap-3 overflow-y-auto p-4"
+        className="plate sheet-panel scroll-quiet max-w-[980px] gap-3 overflow-y-auto p-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3">
@@ -81,7 +74,7 @@ export function SampleSheet({ pipeline, body, onClose }: Props) {
             <p className="text-[12px] text-dim">{body.tagline}</p>
             <p className="font-[family-name:var(--font-osd)] text-[12px] text-amber">{body.format}</p>
           </div>
-          <button type="button" className="key h-9 w-9 shrink-0 p-0" aria-label="Close samples" onClick={onClose}>
+          <button type="button" className="key key-icon shrink-0" aria-label="Close samples" onClick={onClose}>
             <IconClose />
           </button>
         </div>
@@ -93,7 +86,7 @@ export function SampleSheet({ pipeline, body, onClose }: Props) {
         <ul className="grid gap-3 sm:grid-cols-3">
           {samples.map((s) => (
             <li key={s.scene} className="grid content-start gap-1.5">
-              <img src={s.url} alt={`${body.badge} sample: ${s.label}`} className="w-full border border-line" />
+              <img src={s.url} alt={`${body.badge} sample: ${s.label}`} className="img-edge w-full" />
               <span className="text-[11px] text-dim">{s.label}</span>
             </li>
           ))}

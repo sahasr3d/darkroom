@@ -1,5 +1,5 @@
 import type { Rect } from '../cameras/types'
-import type { GridKind } from './AidsPanel'
+import type { GridKind } from '../app/aids'
 
 type Props = {
   /** Image area inside the shell, in CSS pixels. */

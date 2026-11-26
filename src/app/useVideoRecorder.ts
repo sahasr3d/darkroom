@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { fpsOf } from '../cameras/bodies/video'
 import type { RecordingAudio } from '../engine/audio/capture'
-import { download, type ExportResult } from '../engine/exporter'
 import type { Pipeline, Shot } from '../engine/pipeline'
 import type { RecordingResult, RecordingSession } from '../engine/recorder'
 import { slug, stamp } from './naming'
+import type { Keep } from './roll/keep'
+import { thumbnailFromCanvas } from './roll/thumbnail'
+import { snapshotOf, type Snapshot } from './snapshot'
 
 /** Long edge of recorded clips: 720p-class keeps 30 fps rendering comfortable on phones. */
 export const RECORD_MAX_EDGE = 1280
@@ -24,6 +26,9 @@ interface ClipMeta {
   h: number
   extensionFor: (mime: string) => string
   audio: RecordingAudio | null
+  /** The recorder canvas: its last frame becomes the roll thumbnail. */
+  canvas: HTMLCanvasElement
+  snapshot: Snapshot
 }
 
 const errorText = (err: unknown, fallback: string): string => (err instanceof Error ? err.message : fallback)
@@ -31,9 +36,10 @@ const errorText = (err: unknown, fallback: string): string => (err instanceof Er
 /**
  * Records the current shot through the pipeline at the body's frame rate. `getShot` is read on
  * every frame, so grading changes made while rolling land in the clip. The recorder and the sound
- * chain are loaded on the first recording, keeping them out of the initial bundle.
+ * chain are loaded on the first recording, keeping them out of the initial bundle. Finished clips
+ * go to the camera roll through `keep`.
  */
-export function useVideoRecorder(pipeline: Pipeline | null, getShot: () => Shot | null, onStatus: (message: string) => void): VideoRecorder {
+export function useVideoRecorder(pipeline: Pipeline | null, getShot: () => Shot | null, onStatus: (message: string) => void, keep: Keep): VideoRecorder {
   const [since, setSince] = useState<number | null>(null)
   const session = useRef<RecordingSession | null>(null)
   const meta = useRef<ClipMeta | null>(null)
@@ -53,11 +59,17 @@ export function useVideoRecorder(pipeline: Pipeline | null, getShot: () => Shot 
     (r: RecordingResult) => {
       const m = finish()
       if (!m) return
-      const result: ExportResult = { blob: r.blob, width: m.w, height: m.h, filename: `${slug(m.badge)}-${stamp()}.${m.extensionFor(r.mimeType)}` }
-      download(result)
-      onStatus(`Saved ${result.filename} (${r.seconds.toFixed(1)}s, ${m.fps} fps, ${m.w}×${m.h}).`)
+      const filename = `${slug(m.badge)}-${stamp()}.${m.extensionFor(r.mimeType)}`
+      const details = `${r.seconds.toFixed(1)}s, ${m.fps} fps, ${m.w}×${m.h}.`
+      void thumbnailFromCanvas(m.canvas)
+        .then((thumb) => keep([{ kind: 'video', blob: r.blob, width: m.w, height: m.h, filename, snapshot: m.snapshot, thumb }]))
+        .then((summary) => onStatus(`${summary} ${details}`))
+        .catch((err: unknown) => onStatus(errorText(err, 'The clip could not be saved.')))
+        .finally(() => {
+          m.canvas.width = 0
+        })
     },
-    [onStatus, finish],
+    [onStatus, finish, keep],
   )
 
   const fail = useCallback(
@@ -85,7 +97,7 @@ export function useVideoRecorder(pipeline: Pipeline | null, getShot: () => Shot 
         if (video instanceof HTMLVideoElement && video.src.startsWith('blob:')) video.currentTime = 0
         audio = capture ? await capture.openRecordingAudio({ image: video, bodyId: shot.body.id, fps }) : null
         const sourceId = shot.source.id
-        meta.current = { badge: shot.body.badge, fps, w: layout.canvasW, h: layout.canvasH, extensionFor: rec.extensionFor, audio }
+        meta.current = { badge: shot.body.badge, fps, w: layout.canvasW, h: layout.canvasH, extensionFor: rec.extensionFor, audio, canvas, snapshot: snapshotOf(shot) }
         session.current = rec.startRecording({
           canvas,
           fps,

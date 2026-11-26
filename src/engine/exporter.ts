@@ -11,11 +11,15 @@ export interface ExportResult {
   filename: string
 }
 
-function toBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+function toBlob(canvas: HTMLCanvasElement, type: 'image/png' | 'image/jpeg' = 'image/png', quality?: number): Promise<Blob> {
+  const kind = type === 'image/png' ? 'PNG' : 'JPEG'
   return new Promise((resolve, reject) => {
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('The browser could not encode this PNG. Try a smaller image.'))), 'image/png')
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error(`The browser could not encode this ${kind}. Try a smaller image.`))), type, quality)
   })
 }
+
+/** Originals are kept as high-quality JPEG: a fraction of a PNG's size, plenty to develop again. */
+const ORIGINAL_QUALITY = 0.95
 
 /** Zero-size a big scratch canvas so Safari/iOS hand its backing store back immediately. */
 function release(canvas: HTMLCanvasElement): void {
@@ -39,7 +43,7 @@ export function renderFull(pipeline: Pipeline, shot: Shot): HTMLCanvasElement {
 
 const slug = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
-/** Dual saving: the untouched source at its native resolution (mirrored as it was framed). */
+/** The untouched source at its native resolution (mirrored as it was framed): kept in the roll for re-developing, downloaded too with dual saving. */
 export async function exportOriginal(shot: Shot): Promise<ExportResult> {
   const { source } = shot
   const canvas = document.createElement('canvas')
@@ -52,9 +56,9 @@ export async function exportOriginal(shot: Shot): Promise<ExportResult> {
     ctx.scale(-1, 1)
   }
   ctx.drawImage(source.image, 0, 0, source.width, source.height)
-  const blob = await toBlob(canvas)
+  const blob = await toBlob(canvas, 'image/jpeg', ORIGINAL_QUALITY)
   release(canvas)
-  return { blob, width: source.width, height: source.height, filename: `${slug(shot.body.badge)}-${stamp()}-original.png` }
+  return { blob, width: source.width, height: source.height, filename: `${slug(shot.body.badge)}-${stamp()}-original.jpg` }
 }
 
 export async function exportPng(pipeline: Pipeline, shot: Shot): Promise<ExportResult> {

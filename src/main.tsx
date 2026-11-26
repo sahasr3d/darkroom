@@ -1,4 +1,5 @@
 import './index.css'
+import './ui/panels.css'
 import '@fontsource/jetbrains-mono/400.css'
 import '@fontsource/jetbrains-mono/500.css'
 import '@fontsource/space-mono/700.css'

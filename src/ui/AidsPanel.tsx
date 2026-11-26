@@ -1,21 +1,8 @@
+import type { Aids, GridKind, TimerSeconds } from '../app/aids'
 import type { BlendMode, Rig } from '../engine/look'
 import type { Horizon } from '../engine/useHorizon'
 import { ControlGroupBox, Fader, Segmented, Switch } from './controls'
-import { IconUpload } from './icons'
-
-export type GridKind = 'off' | 'thirds' | 'cross' | 'golden'
-export type TimerSeconds = 0 | 3 | 10
-
-export interface Aids {
-  grid: GridKind
-  timer: TimerSeconds
-  level: boolean
-  dualSave: boolean
-  /** Video bodies: record sound (microphone or the imported video's track) through the body's sound chain. */
-  sound: boolean
-}
-
-export const DEFAULT_AIDS: Aids = { grid: 'off', timer: 0, level: false, dualSave: false, sound: true }
+import { IconKeyboard, IconReseed, IconUpload } from './icons'
 
 type Props = {
   aids: Aids
@@ -26,6 +13,11 @@ type Props = {
   live: boolean
   /** The mounted body records video, so the sound switch applies. */
   videoBody: boolean
+  /** Also download each exposure, besides keeping it in the camera roll. */
+  alsoDownload: boolean
+  onAlsoDownload: (on: boolean) => void
+  onShortcuts: () => void
+  onTour: () => void
   onAids: (patch: Partial<Aids>) => void
   onRig: (patch: Partial<Rig>) => void
   onFullscreen: () => void
@@ -33,7 +25,7 @@ type Props = {
   onClearSecond: () => void
 }
 
-/** Shooting aids, double exposure and dual saving. */
+/** Shooting aids, saving, double exposure and help. */
 export function AidsPanel(p: Props) {
   const { aids, rig, horizon } = p
   return (
@@ -75,7 +67,12 @@ export function AidsPanel(p: Props) {
           ]}
           onChange={(v) => p.onAids({ timer: Number(v) as TimerSeconds })}
         />
-        <Switch label="Save the original too" checked={aids.dualSave} onChange={(v) => p.onAids({ dualSave: v })} />
+      </ControlGroupBox>
+
+      <ControlGroupBox title="Saving">
+        <p className="text-[11px] leading-4 text-dim [text-wrap:pretty]">Every shot is kept in the camera roll on this device.</p>
+        <Switch label="Also download each shot" checked={p.alsoDownload} onChange={p.onAlsoDownload} />
+        {p.alsoDownload && <Switch label="Download the original too" checked={aids.dualSave} onChange={(v) => p.onAids({ dualSave: v })} />}
       </ControlGroupBox>
 
       {p.videoBody && (
@@ -128,6 +125,19 @@ export function AidsPanel(p: Props) {
             )}
           </>
         )}
+      </ControlGroupBox>
+
+      <ControlGroupBox title="Help">
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className="key keyboard-only" onClick={p.onShortcuts}>
+            <IconKeyboard />
+            Keyboard shortcuts
+          </button>
+          <button type="button" className="key" onClick={p.onTour}>
+            <IconReseed />
+            Show the tour again
+          </button>
+        </div>
       </ControlGroupBox>
     </>
   )

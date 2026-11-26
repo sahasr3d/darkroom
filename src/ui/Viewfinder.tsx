@@ -3,7 +3,7 @@ import type { Rect } from '../cameras/types'
 import type { Pipeline, Shot } from '../engine/pipeline'
 import { INITIAL_GOVERNOR, previewTag, scaleOf, stepGovernor } from '../engine/previewScale'
 import { clamp } from '../engine/rng'
-import type { GridKind } from './AidsPanel'
+import type { GridKind } from '../app/aids'
 import { FinderOverlays } from './FinderOverlays'
 
 const scaleRect = (r: Rect, s: number): Rect => ({ x: r.x * s, y: r.y * s, w: r.w * s, h: r.h * s })

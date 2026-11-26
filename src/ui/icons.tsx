@@ -120,3 +120,63 @@ export const IconSample = (p: IconProps) => (
     <path d="M5.75 3.5v9M10.25 3.5v9" />
   </svg>
 )
+
+/** Camera roll: a stack of developed prints. */
+export const IconPrints = (p: IconProps) => (
+  <svg {...base} {...p}>
+    <rect x="4.25" y="4.25" width="10" height="9.5" />
+    <path d="M1.75 11.25V1.75h9.5" />
+    <path d="M4.25 11.5 7.5 8.25l2 2 1.75-1.5 3 2.75" strokeWidth="1" />
+  </svg>
+)
+
+/** Share: a print leaving its tray. */
+export const IconShare = (p: IconProps) => (
+  <svg {...base} {...p}>
+    <path d="M5 6.5H2.75v7.75h10.5V6.5H11" />
+    <path d="M8 10V1.75M5.25 4.25 8 1.5l2.75 2.75" />
+  </svg>
+)
+
+export const IconTrash = (p: IconProps) => (
+  <svg {...base} {...p}>
+    <path d="M2 4h12M6 4V2h4v2" />
+    <path d="M3.5 4l.75 10h7.5l.75-10" />
+    <path d="M6.75 7v4.5M9.25 7v4.5" strokeWidth="1" />
+  </svg>
+)
+
+export const IconLink = (p: IconProps) => (
+  <svg {...base} {...p}>
+    <path d="M6.75 9.25 9.25 6.75" />
+    <path d="M7.5 4.5 9 3a2.47 2.47 0 0 1 3.5 3.5L11 8M8.5 11.5 7 13a2.47 2.47 0 0 1-3.5-3.5L5 8" />
+  </svg>
+)
+
+export const IconPencil = (p: IconProps) => (
+  <svg {...base} {...p}>
+    <path d="M2.25 13.75 3 10.5l7.75-7.75 2.5 2.5L5.5 13z" />
+    <path d="M9.25 4.25l2.5 2.5" strokeWidth="1" />
+  </svg>
+)
+
+/** Recipe card: a filed setup with a notch. */
+export const IconRecipe = (p: IconProps) => (
+  <svg {...base} {...p}>
+    <path d="M3 1.75h7l3 3v9.5H3z" />
+    <path d="M5.5 7.5h5M5.5 10.5h3.5" strokeWidth="1" />
+  </svg>
+)
+
+export const IconArrow = (p: IconProps) => (
+  <svg {...base} {...p}>
+    <path d="M10 3 5 8l5 5" />
+  </svg>
+)
+
+export const IconKeyboard = (p: IconProps) => (
+  <svg {...base} {...p}>
+    <rect x="1.5" y="4" width="13" height="8.5" />
+    <path d="M4 6.75h.5M6.75 6.75h.5M9.5 6.75h.5M12 6.75h.01M5 9.75h6" strokeWidth="1.25" />
+  </svg>
+)

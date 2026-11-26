@@ -11,17 +11,26 @@
   --color-line: #2a2d33;
   --color-line-hi: #3b3f46;
   --color-silver: #d9d6ce;
-  --color-dim: #8a8780;
-  --color-faint: #5c5a55;
+  /* dim: 5.4:1 or better on every surface (key faces included) for WCAG AA small text */
+  --color-dim: #9a968e;
+  /* faint: decorative ticks only, never text */
+  --color-faint: #67655f;
   --color-amber: #ffb020;
   --color-amber-deep: #b5740a;
   --color-rec: #ff3b2f;
   --font-ui: 'JetBrains Mono', ui-monospace, monospace;
   --font-badge: 'Space Mono', ui-monospace, monospace;
   --font-osd: 'Share Tech Mono', ui-monospace, monospace;
+  /* Motion: a strong ease-out for things answering a press, a drawer curve for sheets. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 @layer base {
+  html {
+    color-scheme: dark;
+  }
   html,
   body,
   #root {
@@ -39,8 +48,13 @@
     overscroll-behavior: none;
   }
   :focus-visible {
-    outline: 1px solid var(--color-amber);
-    outline-offset: 2px;
+    outline: 2px solid var(--color-amber);
+    outline-offset: 1px;
+  }
+  kbd,
+  .readout,
+  output {
+    font-variant-numeric: tabular-nums;
   }
   ::selection {
     background: var(--color-amber);
@@ -113,11 +127,22 @@
   color: var(--color-silver);
   font: 500 12px/1 var(--font-ui);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 1px 0 #000;
-  transition: transform 80ms ease-out, background-color 120ms, border-color 120ms;
+  transition-property: transform, background-color, border-color, color, box-shadow;
+  transition-duration: 120ms;
+  transition-timing-function: var(--ease-out);
   user-select: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
-.key:hover { border-color: #565b63; }
-.key:active { transform: translateY(1px); }
+@media (hover: hover) and (pointer: fine) {
+  .key:hover:not(:disabled) { border-color: #565b63; }
+}
+/* Pressed: the key sinks and its top light goes out. */
+.key:active:not(:disabled) {
+  transform: scale(0.97);
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.6);
+  background: linear-gradient(180deg, #17181c, #1c1e22);
+}
 .key[aria-pressed='true'],
 .key[aria-checked='true'] {
   border-color: var(--color-amber-deep);
@@ -266,13 +291,16 @@
   background: radial-gradient(circle at 38% 32%, #f0eee8, #b9bbbf 45%, #74777d 100%);
   border: 1px solid #000;
   box-shadow: inset 0 -3px 6px rgb(0 0 0 / 0.35);
-  transition: transform 70ms ease-out, box-shadow 70ms ease-out;
+  /* The release springs back slower than the press goes down. */
+  transition: transform 160ms var(--ease-out), box-shadow 160ms var(--ease-out);
 }
-.shutter:active .shutter-cap,
+.shutter:active:not(:disabled) .shutter-cap,
 .shutter[data-firing='true'] .shutter-cap {
   transform: scale(0.92);
   box-shadow: inset 0 2px 6px rgb(0 0 0 / 0.55);
+  transition-duration: 60ms;
 }
+.shutter:focus-visible { outline-offset: 4px; }
 .shutter:disabled { opacity: 0.45; cursor: not-allowed; }
 
 /* ---------- Body plates on the shelf ---------- */
@@ -303,6 +331,9 @@
 .no-scrollbar::-webkit-scrollbar { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
-  .key, .shutter-cap { transition: none; }
+  .key, .shutter-cap { transition-property: background-color, border-color, color, box-shadow; }
+  .key:active:not(:disabled) { transform: none; }
+  .shutter:active:not(:disabled) .shutter-cap,
+  .shutter[data-firing='true'] .shutter-cap { transform: none; }
   .curtain { animation: none; }
 }
