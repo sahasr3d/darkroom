@@ -67,7 +67,8 @@ async function run<T>(mode: IDBTransactionMode, fallback: string, body: (store: 
     }
     const req = body(tx.objectStore(STORE))
     tx.oncomplete = () => resolve((req?.result ?? undefined) as T)
-    tx.onerror = () => reject(wrap(tx.error, fallback))
+    // A request error bubbles here before tx.error is set, so read it from the failing request.
+    tx.onerror = (e) => reject(wrap((e.target as IDBRequest | null)?.error ?? tx.error, fallback))
     tx.onabort = () => reject(wrap(tx.error, fallback))
   })
 }

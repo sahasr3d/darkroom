@@ -11,8 +11,11 @@ export interface Roll {
   /** Why storage is unavailable, shown in the roll sheet. */
   notice: string | null
   bytes: number
-  /** Keep an exposure. Rejects with a user-facing message (e.g. the disk is full). */
-  add: (entry: NewRollEntry) => Promise<RollEntry>
+  /**
+   * Keep an exposure. `persisted` is false when it is held in memory only (storage unavailable),
+   * so the caller should also download it. Rejects with a user-facing message (e.g. the disk is full).
+   */
+  add: (entry: NewRollEntry) => Promise<{ entry: RollEntry; persisted: boolean }>
   remove: (id: string) => Promise<void>
   clear: () => Promise<void>
 }
@@ -47,7 +50,7 @@ export function useRoll(): Roll {
     }
   }, [])
 
-  const add = useCallback(async (input: NewRollEntry): Promise<RollEntry> => {
+  const add = useCallback(async (input: NewRollEntry): Promise<{ entry: RollEntry; persisted: boolean }> => {
     const now = Date.now()
     const entry: RollEntry = { ...input, id: newEntryId(now), createdAt: now }
     if (persistent.current) {
@@ -61,7 +64,7 @@ export function useRoll(): Roll {
       }
     }
     setEntries((list) => [entry, ...list])
-    return entry
+    return { entry, persisted: persistent.current }
   }, [])
 
   const remove = useCallback(async (id: string) => {
